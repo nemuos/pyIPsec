@@ -39,7 +39,7 @@ def createNewConnection(name, lines):
     conn = connection(name)
 
     for line in lines:
-        pair = line.split('=')
+        pair = line.split('=', 1)
         conn.__setitem__(pair[0], pair[1])
 
     return conn
@@ -73,6 +73,7 @@ def main():
         Parse command line arguments
     """
     connArg = False
+    lineArg = False
     confFile = '/etc/ipsec.conf'
     lines = []
 
@@ -83,7 +84,7 @@ def main():
 
     # First argument must be one of -a or -d or -m
     if optlist[0][0] not in ['-a', '-d', '-m']:
-        print "Wrong first argument"
+        print "Wrong first argument\nShould be '-a' or '-b' or '-m'"
         sys.exit(1)
 
     if optlist[0][0] == '-a':
@@ -92,7 +93,6 @@ def main():
         action = DELETE
     else:
         action = MODIFY
-
 
     # Rest are long opts
     optlist = optlist[1:]
@@ -112,6 +112,19 @@ def main():
 
     if connArg == False:
         print "No connection argument"
+        sys.exit(1)
+
+    for opt in optlist:
+        if opt[0] == '--line': 
+            if action == DELETE:
+                print "No --line argument should be in delete"
+                sys.exit(1)
+
+            lineArg = True      
+            break
+
+    if lineArg == False and action == ADD:
+        print "At least one --line argument should be in add"
         sys.exit(1)
 
     for opt in optlist:

@@ -49,7 +49,7 @@ class fmod(list):
         connName = conn.name
         lines = len(self.lines)
 
-        if self.lines[lines - 1] != '\n':
+        if lines == 0 or self.lines[lines - 1] != '\n':
             self.lines.append('\n')
 
         # add connection name
@@ -61,7 +61,10 @@ class fmod(list):
             newLine = TAB + key + '=' + conn.data[key] + '\n'
             self.lines.append(newLine)
 
-        self.lines.append('\n')      
+        self.lines.append('\n')     
+
+        if lines == 0:
+            self.lines = self.lines[1:]
 
 
     def replaceLines(self, conn):
