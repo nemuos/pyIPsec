@@ -2,10 +2,20 @@ import sys
 import getopt
 
 from conn import *
+from fhandler import *
 
 ADD = 0
 DELETE = 1
 MODIFY = 2
+
+def updateIPsecConfFile(conn, confFile):
+    fh = fhandler(confFile)
+    fh.storeFileLines()
+    print fh
+
+    fh.replaceLines(conn) 
+
+    print fh
 
 def createNewConnection(name, lines):
     conn = connection(name)
@@ -97,9 +107,9 @@ def main():
 
     # All checks passeggd, create new connection
     conn = createNewConnection(connName, lines)
-
     print conn 
 
+    updateIPsecConfFile(conn, confFile)
 
 if __name__ == '__main__':
     main()
