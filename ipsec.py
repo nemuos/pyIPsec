@@ -16,14 +16,14 @@ def main():
     confFile = '/etc/ipsec.conf'
     lines = []
 
-    shortopts = 'admr'
-    longopts = ['conn=', 'line=', 'file=', 'keylen=']
+    shortopts = 'admrs'
+    longopts = ['conn=', 'line=', 'file=', 'keylen=', 'rsa-key=']
 
     optlist, args = getopt.getopt(sys.argv[1:], shortopts, longopts)
 
-    # First argument must be one of -a or -d or -m or -r
-    if optlist[0][0] not in ['-a', '-d', '-m', '-r']:
-        print "Wrong first argument\nShould be '-a' or '-b' or '-m' or '-r'"
+    # First argument must be one of [-a, -d, -m, -r, -s]
+    if optlist[0][0] not in ['-a', '-d', '-m', '-r', '-s']:
+        print "Wrong first argument\nShould be [-a, -d, -m, -r, -s]"
         sys.exit(1)
 
     if optlist[0][0] == '-a':
@@ -33,7 +33,9 @@ def main():
     elif optlist[0][0] == '-m':
         addOrModActionHandler(optlist)
     elif optlist[0][0] == '-r':
-        rsaActionHandler(optlist)
+        rsaKeyGenActionHandler(optlist)
+    elif optlist[0][0] == '-s':
+        rsaKeySaveActionHandler(optlist)
 
 
 if __name__ == '__main__':

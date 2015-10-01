@@ -160,7 +160,7 @@ def delActionHandler(optlist):
     updateIPsecConfFile(conn, confFile, action)
 
 
-def rsaActionHandler(optlist):
+def rsaKeyGenActionHandler(optlist):
     fileArg = False
     keylenArg = False
     keylen = 2048
@@ -202,3 +202,60 @@ def rsaActionHandler(optlist):
 
     os.system('openssl pkey -in %s -out %s -pubout >> /dev/null 2>&1' 
                % (priFile, pubFile))
+
+
+def rsaKeySaveActionHandler(optlist):
+    fileArg = False
+    keyArg = False
+
+    optlist = optlist[1:]
+    
+    # Check for unrecognized options
+    for opt in optlist:
+        if opt[0] not in ['--rsa-key', '--file']:
+            print 'Unrecognized option %s' % opt[0]
+            sys.exit(1)
+
+    for opt in optlist:
+        if fileArg == False and opt[0] == '--file':
+            fileArg = True
+            fileName = opt[1]
+        elif fileArg == True and opt[0] == '--file': 
+            print 'Only one file option should be present'
+            sys.exit(1)
+        elif keyArg == False and opt[0] == '--rsa-key':
+            keyArg = True
+            rsaKey = opt[1]
+        elif keyArg == True and opt[0] == '--rsa-key':
+            print 'Only one keylen option should be present'
+            sys.exit(1)
+
+    if fileArg == False:
+        print '--file option missing'
+        sys.exit(1)
+    
+    if keyArg == False:
+        print '--rsa-key option missing'
+        sys.exit(1)
+
+    # delete existing file of same name
+    if (os.path.isfile(fileName)):
+        os.remove(fileName)
+
+    startLine = '-----BEGIN PUBLIC KEY-----\n' 
+    endLine = '-----END PUBLIC KEY-----\n'
+
+    fh = open(fileName, "w")
+    fh.write(startLine) 
+    
+    while (len(rsaKey) >= 64):
+        line = rsaKey[0:64] + '\n'
+        fh.write(line)
+        rsaKey = rsaKey[64:]
+
+    if len(rsaKey) != 0:
+        fh.write(rsaKey + '\n')
+
+    fh.write(endLine) 
+    
+    fh.close()
