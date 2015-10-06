@@ -1,5 +1,9 @@
 import os
 import sys
+from pyparsing import *
+
+from conn import *
+from fmod import *
 
 ADD = 0
 DELETE = 1
@@ -65,14 +69,25 @@ def validateOptions(lines):
     return True
 
 
-def addorModActionHandler(optlist):
+def parseOptions(optList, validList):
+    parsedArgs = {}
+
+    for opt in optList:
+        if opt[0] in validList and opt[0] in parsedArgs:
+            print 'Only one %s option should be present' % opt[0]
+            sys.exit(1)
+
+        parsedArgs[opt[0]] = opt[1]  
+
+
+def addOrModActionHandler(optlist):
     connArg = False
     lineArg = False
     fileArg = False
     confFile = '/etc/ipsec.conf'
     lines = []
 
-    if optlist[0] == '-a':
+    if optlist[0][0] == '-a':
         action = ADD
     else:
         action = MODIFY
@@ -84,12 +99,12 @@ def addorModActionHandler(optlist):
         if opt[0] not in ['--conn', '--line', '--file']:
             print 'Unrecognized option %s' % opt[0]
             sys.exit(1)
-    
+   
     for opt in optlist:
         if connArg == False and opt[0] == '--conn':
             connArg = True
             connName = opt[1]
-            optlist.remove(opt)
+            #optlist.remove(opt)
         elif connArg == True and opt[0] == '--conn':
             print 'More than one connection option'
             sys.exit(1)
@@ -139,7 +154,7 @@ def delActionHandler(optlist):
         if connArg == False and opt[0] == '--conn':
             connArg = True
             connName = opt[1]
-            optlist.remove(opt)
+            #optlist.remove(opt)
         elif connArg == True and opt[0] == '--conn':
             print 'More than one connection option'
             sys.exit(1)
@@ -259,3 +274,102 @@ def rsaKeySaveActionHandler(optlist):
     fh.write(endLine) 
     
     fh.close()
+
+
+def getSaGrammar():
+    ParserElement.setDefaultWhitespaceChars('\t ')                              
+    SOL = LineStart().suppress()                                                
+    EOL = LineEnd().suppress()                                                  
+                                                                                
+    ipv4Addr = (Combine(Word(nums) + ('.' + Word(nums))*3))                     
+    hashAlgo = Literal('hmac(') + (Literal('sha1') | Literal('md5')).setResultsName('hashAlgo') + Literal(')')
+    encAlgo = Literal('cbc(') + (Literal('des3_ede') | Literal('aes128')).setResultsName('encAlgo') + Literal(')')
+    proto = (Literal('esp') | Literal('ah')).setResultsName('proto')            
+    spi = Word(nums + 'abcdefx').setResultsName('spi')                          
+    mode = (Literal('tunnel') | Literal('transport')).setResultsName('mode')    
+    hashKey = Word(nums + 'abcdefx')                                            
+    hashLen = Word(nums)                                                        
+    encKey = Word(nums + 'abcdefx')                                             
+                                                                                
+    paragraph = Group(SOL + \
+                Literal('src') + ipv4Addr.setResultsName('src') + \
+                Literal('dst') + ipv4Addr.setResultsName('dst') + \
+                EOL + \
+                Literal('proto') + proto + \
+                Literal('spi') + spi + \
+                Literal('reqid') + Word(nums) + \
+                Literal('mode') + mode + \
+                EOL + \
+                Literal('replay-window') + Word(nums) + \
+                Literal('flag') + Word(alphas + '-') + \
+                EOL + \
+                Literal('auth-trunc') + hashAlgo + \
+                hashKey + hashLen + \
+                EOL + \
+                Literal('enc') + encAlgo + \
+                encKey + \
+                EOL)
+
+    grammar = OneOrMore(paragraph)
+
+    return grammar
+
+
+
+
+def saShowHandler(optlist):
+    fileArg = False
+    peerArg = False
+
+    peerIP = None
+
+    optlist = optlist[1:]
+    
+    # Check for unrecognized options
+    for opt in optlist:
+        if opt[0] not in ['--file', '--peer']:
+            print 'Unrecognized option %s' % opt[0]
+            sys.exit(1)
+
+    for opt in optlist:
+        if fileArg == False and opt[0] == '--file':
+            fileArg = True
+            fileName = opt[1]
+        elif fileArg == True and opt[0] == '--file': 
+            print 'Only one file option should be present'
+            sys.exit(1)
+        if peerArg == False and opt[0] == '--peer':
+            peerArg = True
+            peerIP = opt[1]
+        elif peerArg == True and opt[0] == '--peer': 
+            print 'Only one peer option should be present'
+            sys.exit(1)
+
+    if fileArg == False:
+        print '--file option missing'
+        sys.exit(1)
+
+    #if not peerIP:
+        #os.system("ip xfrm state ls > %s" % fileName);
+    #else
+        #os.system("ip xfrm state ls dst %s > %s" % (peerIP, fileName))
+        #os.system("ip xfrm state ls src %s > %s" % (peerIP, fileName))
+
+    saGrammar = getSaGrammar()
+
+    try:
+        parsedState = saGrammar.parseFile(fileName)
+
+        print "Dst           Src           Proto   Encrypt   Hash  Mode      Spi"
+        print "------------------------------------------------------------------------"
+
+        for state in parsedState:
+            print "%-14s%-14s%-8s%-10s%-6s%-10s%s" % \
+                (state.dst, state.src, state.proto, state.encAlgo, 
+                 state.hashAlgo, state.mode , state.spi)
+
+        print ""
+        
+    except ParseException:
+        print 'Parse exception'
+        sys.exit(1)

@@ -35,7 +35,8 @@ def main():
     elif optlist[0][0] == '-r':
         rsaKeyGenActionHandler(optlist)
     elif optlist[0][0] == '-s':
-        rsaKeySaveActionHandler(optlist)
+        #rsaKeySaveActionHandler(optlist)
+        saShowHandler(optlist)
 
 
 if __name__ == '__main__':
