@@ -9,6 +9,13 @@ ADD = 0
 DELETE = 1
 MODIFY = 2
 
+OPTIONAL = 0
+MANDATORY = 1
+
+SINGLE = 0
+MULTI = 1
+
+
 def updateIPsecConfFile(conn, confFile, action):
     fm = fmod(confFile)
     fm.storeFileLines()
@@ -80,12 +87,45 @@ def parseOptions(optList, validList):
         parsedArgs[opt[0]] = opt[1]  
 
 
+def parseOptions(optlist, template):
+    for opt in optlist:
+        if opt[0] not in template:
+            print '%s option not valid in current context' % opt[0]
+            sys.exit(1)
+
+    parsedArgs = {}
+    for key in template.keys():
+        parsedArgs[key] = [False]
+
+
+    for opt in optlist:
+        if parsedArgs[opt[0]][0] == False:
+            parsedArgs[opt[0]][0] = True
+            parsedArgs[opt[0]].append(opt[1])
+
+        elif parsedArgs[opt[0]][0] == True and template[opt[0]][1] == SINGLE:
+            print 'More than one %s option' % opt[0]
+            sys.exit(1)
+
+        elif parsedArgs[opt[0]][0] == True and template[opt[0]][1] == MULTI:
+            parsedArgs[opt[0]].append(opt[1])
+
+    for arg in template.keys():
+        if template[arg][0] == MANDATORY and parsedArgs[arg][0] == False:
+            print 'No %s option present' % arg
+            sys.exit(1)
+
+    for key in parsedArgs.keys():
+        if parsedArgs[key][0] == False:
+            del parsedArgs[key]
+        else:
+            parsedArgs[key] = parsedArgs[key][1:]
+
+    return parsedArgs            
+
+
 def addOrModActionHandler(optlist):
-    connArg = False
-    lineArg = False
-    fileArg = False
     confFile = '/etc/ipsec.conf'
-    lines = []
 
     if optlist[0][0] == '-a':
         action = ADD
@@ -93,39 +133,22 @@ def addOrModActionHandler(optlist):
         action = MODIFY
 
     optlist = optlist[1:]
-
-    # Check for unrecognized options
-    for opt in optlist:
-        if opt[0] not in ['--conn', '--line', '--file']:
-            print 'Unrecognized option %s' % opt[0]
-            sys.exit(1)
    
-    for opt in optlist:
-        if connArg == False and opt[0] == '--conn':
-            connArg = True
-            connName = opt[1]
-            #optlist.remove(opt)
-        elif connArg == True and opt[0] == '--conn':
-            print 'More than one connection option'
-            sys.exit(1)
-        elif opt[0] == '--line':
-            lineArg = True
-            lines.append(opt[1])
-        elif fileArg == False and opt[0] == '--file':
-            confFile = opt[1]
-            fileArg = True
-        elif fileArg == True and opt[0] == '--file':
-            print 'More than one file option'
-            sys.exit(1)
+    template = \
+        {
+            '--file'    :   [OPTIONAL, SINGLE],
+            '--conn'    :   [MANDATORY, SINGLE],
+            '--line'    :   [MANDATORY, MULTI]
+        }
+   
+    parsedArgs = parseOptions(optlist, template)
+    print parsedArgs
 
-    if connArg == False:
-        print 'No connection option'
-        sys.exit(1)
-                
-    if lineArg == False:
-        print 'At lease one --line option should be in add/modify'
-        sys.exit(1)
-    
+    lines = parsedArgs['--line']
+    connName = parsedArgs['--conn'][0]
+    if '--file' in parsedArgs:
+        confFile = parsedArgs['--file'][0]
+
     if not validateOptions(lines):
         sys.exit(1)
 
@@ -136,76 +159,50 @@ def addOrModActionHandler(optlist):
 
 
 def delActionHandler(optlist):
-    connArg = False
-    fileArg = False
     confFile = '/etc/ipsec.conf'
-    lines = []
 
     action = DELETE
     optlist = optlist[1:]
+    
+    template = \
+        {
+            '--file'    :   [OPTIONAL, SINGLE],
+            '--conn'    :   [MANDATORY, SINGLE],
+        }
+   
+    parsedArgs = parseOptions(optlist, template)
+    print parsedArgs
 
-    # Check for unrecognized options
-    for opt in optlist:
-        if opt[0] not in ['--conn', '--file']:
-            print 'Unrecognized option %s' % opt[0]
-            sys.exit(1)
-    
-    for opt in optlist:
-        if connArg == False and opt[0] == '--conn':
-            connArg = True
-            connName = opt[1]
-            #optlist.remove(opt)
-        elif connArg == True and opt[0] == '--conn':
-            print 'More than one connection option'
-            sys.exit(1)
-        elif fileArg == False and opt[0] == '--file':
-            confFile = opt[1]
-            fileArg = True
-        elif fileArg == True and opt[0] == '--file':
-            print 'More than one file option'
-            sys.exit(1)
-    
-    if connArg == False:
-        print 'No connection option'
-        sys.exit(1)
+    connName = parsedArgs['--conn'][0]
+    if '--file' in parsedArgs:
+        confFile = parsedArgs['--file'][0]
+
 
     # All checks passed, create new connection
-    conn = createNewConnection(connName, lines)
+    conn = createNewConnection(connName, [])
 
     updateIPsecConfFile(conn, confFile, action)
 
 
 def rsaKeyGenActionHandler(optlist):
-    fileArg = False
-    keylenArg = False
     keylen = 2048
 
     optlist = optlist[1:]
     
-    # Check for unrecognized options
-    for opt in optlist:
-        if opt[0] not in ['--keylen', '--file']:
-            print 'Unrecognized option %s' % opt[0]
-            sys.exit(1)
+    template = \
+        {
+            '--file'    :   [MANDATORY, SINGLE],
+            '--keylen'  :   [OPTIONAL, SINGLE],
+        }
+   
+    parsedArgs = parseOptions(optlist, template)
+    print parsedArgs
 
-    for opt in optlist:
-        if fileArg == False and opt[0] == '--file':
-            fileArg = True
-            fileName = opt[1]
-        elif fileArg == True and opt[0] == '--file': 
-            print 'Only one file option should be present'
-            sys.exit(1)
-        elif keylenArg == False and opt[0] == '--keylen':
-            keylenArg = True
-            keylen = opt[1]
-        elif keylenArg == True and opt[0] == '--keylen':
-            print 'Only one keylen option should be present'
-            sys.exit(1)
+    fileName = parsedArgs['--file'][0]
 
-    if fileArg == False:
-        print '--file option missing'
-        sys.exit(1)
-
+    if '--keylen' in parsedArgs:
+        keylen = parsedArgs['--keylen'][0]
+   
     dirPath = '/'.join(fileName.split('/')[0:-1])
     pubFile, ext = os.path.basename(fileName).split('.')
     priFile = dirPath + '/' + pubFile + '-pri.' + ext
@@ -220,38 +217,19 @@ def rsaKeyGenActionHandler(optlist):
 
 
 def rsaKeySaveActionHandler(optlist):
-    fileArg = False
-    keyArg = False
-
     optlist = optlist[1:]
     
-    # Check for unrecognized options
-    for opt in optlist:
-        if opt[0] not in ['--rsa-key', '--file']:
-            print 'Unrecognized option %s' % opt[0]
-            sys.exit(1)
+    template = \
+        {
+            '--file'    :   [MANDATORY, SINGLE],
+            '--rsa-key' :   [MANDATORY, SINGLE],
+        }
+   
+    parsedArgs = parseOptions(optlist, template)
+    print parsedArgs
 
-    for opt in optlist:
-        if fileArg == False and opt[0] == '--file':
-            fileArg = True
-            fileName = opt[1]
-        elif fileArg == True and opt[0] == '--file': 
-            print 'Only one file option should be present'
-            sys.exit(1)
-        elif keyArg == False and opt[0] == '--rsa-key':
-            keyArg = True
-            rsaKey = opt[1]
-        elif keyArg == True and opt[0] == '--rsa-key':
-            print 'Only one keylen option should be present'
-            sys.exit(1)
-
-    if fileArg == False:
-        print '--file option missing'
-        sys.exit(1)
-    
-    if keyArg == False:
-        print '--rsa-key option missing'
-        sys.exit(1)
+    fileName = parsedArgs['--file'][0]
+    rsaKey = parsedArgs['--rsa-key'][0]
 
     # delete existing file of same name
     if (os.path.isfile(fileName)):
@@ -315,40 +293,24 @@ def getSaGrammar():
     return grammar
 
 
-
-
 def saShowHandler(optlist):
-    fileArg = False
-    peerArg = False
-
     peerIP = None
 
     optlist = optlist[1:]
-    
-    # Check for unrecognized options
-    for opt in optlist:
-        if opt[0] not in ['--file', '--peer']:
-            print 'Unrecognized option %s' % opt[0]
-            sys.exit(1)
+     
+    template = \
+        {
+            '--file'    :   [MANDATORY, SINGLE],
+            '--peer'    :   [OPTIONAL, SINGLE],
+        }
+   
+    parsedArgs = parseOptions(optlist, template)
+    print parsedArgs
 
-    for opt in optlist:
-        if fileArg == False and opt[0] == '--file':
-            fileArg = True
-            fileName = opt[1]
-        elif fileArg == True and opt[0] == '--file': 
-            print 'Only one file option should be present'
-            sys.exit(1)
-        if peerArg == False and opt[0] == '--peer':
-            peerArg = True
-            peerIP = opt[1]
-        elif peerArg == True and opt[0] == '--peer': 
-            print 'Only one peer option should be present'
-            sys.exit(1)
-
-    if fileArg == False:
-        print '--file option missing'
-        sys.exit(1)
-
+    fileName = parsedArgs['--file'][0]
+    if '--peer' in parsedArgs:
+        peerIP = parsedArgs['--peer'][0]
+   
     #if not peerIP:
         #os.system("ip xfrm state ls > %s" % fileName);
     #else
