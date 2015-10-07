@@ -17,9 +17,13 @@ def main():
     lines = []
 
     shortopts = 'admrs'
-    longopts = ['conn=', 'line=', 'file=', 'keylen=', 'rsa-key=']
+    longopts = ['conn=', 'line=', 'file=', 'keylen=', 'rsa-key=', "peer="]
 
-    optlist, args = getopt.getopt(sys.argv[1:], shortopts, longopts)
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:], shortopts, longopts)
+    except GetoptError:
+        print 'Option error'
+        sys.exit(1)
 
     # First argument must be one of [-a, -d, -m, -r, -s]
     if optlist[0][0] not in ['-a', '-d', '-m', '-r', '-s']:

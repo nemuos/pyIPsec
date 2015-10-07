@@ -317,6 +317,10 @@ def saShowHandler(optlist):
         #os.system("ip xfrm state ls dst %s > %s" % (peerIP, fileName))
         #os.system("ip xfrm state ls src %s > %s" % (peerIP, fileName))
 
+    if not os.path.isfile(fileName):
+        print 'file not present'
+        sys.exit(1)
+
     saGrammar = getSaGrammar()
 
     try:
